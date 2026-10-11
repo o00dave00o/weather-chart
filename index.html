@@ -91,6 +91,8 @@
 
     .search-input-wrapper {
       position: relative;
+      display: flex;
+      gap: 8px;
     }
 
     input[type="text"] {
@@ -106,6 +108,25 @@
 
     input[type="text"]:focus {
       border-color: var(--accent);
+    }
+
+    .geo-btn {
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 0 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.1rem;
+      transition: all 0.2s ease;
+    }
+
+    .geo-btn:hover {
+      border-color: var(--accent);
+      background: rgba(59, 130, 246, 0.1);
     }
 
     .suggestions-list {
@@ -269,11 +290,12 @@
     </header>
 
     <div class="controls">
-      <!-- Search Box -->
+      <!-- Search Box & Geolocation Button -->
       <div class="search-group">
         <label for="search-input">Search Location (Town/City/County):</label>
         <div class="search-input-wrapper">
           <input type="text" id="search-input" placeholder="..." autocomplete="off" />
+          <button type="button" id="geo-btn" class="geo-btn" title="Use current location">📍</button>
           <div id="suggestions" class="suggestions-list"></div>
         </div>
       </div>
@@ -322,6 +344,7 @@
     let searchDebounceTimeout = null;
 
     const searchInput = document.getElementById('search-input');
+    const geoBtn = document.getElementById('geo-btn');
     const suggestionsList = document.getElementById('suggestions');
     const dateButtonsContainer = document.getElementById('date-buttons-container');
     const locationText = document.getElementById('location-text');
@@ -345,6 +368,7 @@
         btn.innerHTML = `<span>${dayName}</span><span class="btn-sub">${dateSub}</span>`;
 
         btn.addEventListener('click', () => {
+          if (isFetching) return;
           document.querySelectorAll('.date-btn').forEach(b => b.classList.remove('active'));
           btn.classList.add('active');
           selectedDate = isoDate;
@@ -359,13 +383,42 @@
       buildDateButtons();
 
       searchInput.addEventListener('input', handleSearchInput);
+      geoBtn.addEventListener('click', handleGeolocation);
+
       document.addEventListener('click', (e) => {
-        if (!searchInput.contains(e.target) && !suggestionsList.contains(e.target)) {
+        if (!searchInput.contains(e.target) && !suggestionsList.contains(e.target) && !geoBtn.contains(e.target)) {
           suggestionsList.style.display = 'none';
         }
       });
 
       fetchSingleDayData();
+    }
+
+    function handleGeolocation() {
+      if (isFetching) return;
+
+      if (!navigator.geolocation) {
+        alert("Geolocation is not supported by your browser");
+        return;
+      }
+
+      locationText.innerText = "Detecting current location...";
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          currentLat = position.coords.latitude;
+          currentLng = position.coords.longitude;
+          currentLocationLabel = `Current Location (${currentLat.toFixed(2)}°, ${currentLng.toFixed(2)}°)`;
+          searchInput.value = currentLocationLabel;
+          fetchSingleDayData();
+        },
+        (error) => {
+          console.warn("Geolocation error:", error);
+          alert("Unable to retrieve your location. Please check your browser permissions.");
+          locationText.innerText = currentLocationLabel;
+        },
+        { timeout: 10000, maximumAge: 60000 }
+      );
     }
 
     function handleSearchInput(e) {
@@ -419,6 +472,7 @@
         `;
 
         item.addEventListener('click', () => {
+          if (isFetching) return;
           currentLat = loc.latitude;
           currentLng = loc.longitude;
           currentLocationLabel = fullLabel;
@@ -438,7 +492,7 @@
       isFetching = true;
 
       errorDiv.style.display = 'none';
-      locationText.innerText = currentLocationLabel;
+      locationText.innerText = `${currentLocationLabel} (Updating data...)`;
 
       const times = Array.from({ length: 24 }, (_, i) => `${i.toString().padStart(2, '0')}:00`);
 
@@ -468,6 +522,8 @@
       const results = await Promise.all(fetchPromises);
       const validResults = results.filter(r => r !== null);
 
+      locationText.innerText = currentLocationLabel;
+
       if (validResults.length === 0) {
         errorDiv.innerText = 'Error loading forecast data. Please try another location or date.';
         errorDiv.style.display = 'block';
@@ -485,7 +541,6 @@
       modelResults.forEach(res => {
         const { model, temps, rains } = res;
 
-        // Temperature Dataset (Solid Line)
         if (temps) {
           const tempData = temps.map((val, hourIndex) => ({
             x: hourIndex,
@@ -506,7 +561,6 @@
           });
         }
 
-        // Precipitation Dataset (Dotted Line)
         if (rains) {
           const rainData = rains.map((val, hourIndex) => ({
             x: hourIndex,
