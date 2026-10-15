@@ -314,7 +314,7 @@
     <!-- Scaled Chart Container -->
     <div class="chart-card">
       <div class="chart-container">
-        <canvas id="scatterChart"></canvas>
+        <canvas id="weatherChart"></canvas>
       </div>
     </div>
 
@@ -327,4 +327,359 @@
       { id: 'gfs_seamless', label: 'GFS (NOAA)', color: '#f87171' },   // Coral Red
       { id: 'icon_seamless', label: 'ICON (DWD)', color: '#fbbf24' },  // Gold
       { id: 'ukmo_seamless', label: 'UKMO', color: '#34d399' },        // Mint Green
-      { id: 'meteofrance_seamless', label: 'MeteoFrance', color:
+      { id: 'meteofrance_seamless', label: 'MeteoFrance', color: '#c084fc' }, // Violet
+      { id: 'gem_seamless', label: 'GEM (Canada)', color: '#fb923c' }, // Bright Orange
+      { id: 'jma_seamless', label: 'JMA (Japan)', color: '#22d3ee' },  // Cyan
+      { id: 'dwd_icon_eu', label: 'ICON-EU', color: '#f472b6' },       // Neon Pink
+      { id: 'arpege_world', label: 'ARPEGE', color: '#818cf8' },       // Indigo
+      { id: 'gfs_global', label: 'GFS Global', color: '#9ca3af' }      // Cool Grey
+    ];
+
+    let currentLat = 51.5074;
+    let currentLng = -0.1278;
+    let currentLocationLabel = "London, Greater London, United Kingdom";
+    let selectedDate = new Date().toISOString().split('T')[0];
+    let isFetching = false;
+    let weatherChartInstance = null;
+    let searchDebounceTimeout = null;
+    let activeAbortController = null;
+
+    const searchInput = document.getElementById('search-input');
+    const geoBtn = document.getElementById('geo-btn');
+    const suggestionsList = document.getElementById('suggestions');
+    const dateButtonsContainer = document.getElementById('date-buttons-container');
+    const locationText = document.getElementById('location-text');
+    const errorDiv = document.getElementById('error');
+
+    function buildDateButtons() {
+      dateButtonsContainer.innerHTML = '';
+      const today = new Date();
+
+      for (let i = 0; i < 7; i++) {
+        const d = new Date(today);
+        d.setDate(today.getDate() + i);
+
+        const isoDate = d.toISOString().split('T')[0];
+        const dayName = i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : d.toLocaleDateString('en-GB', { weekday: 'short' });
+        const dateSub = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `date-btn ${i === 0 ? 'active' : ''}`;
+        btn.innerHTML = `<span>${dayName}</span><span class="btn-sub">${dateSub}</span>`;
+
+        btn.addEventListener('click', () => {
+          if (isFetching) return;
+          document.querySelectorAll('.date-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          selectedDate = isoDate;
+          fetchSingleDayData();
+        });
+
+        dateButtonsContainer.appendChild(btn);
+      }
+    }
+
+    function init() {
+      buildDateButtons();
+
+      searchInput.addEventListener('input', handleSearchInput);
+      geoBtn.addEventListener('click', handleGeolocation);
+
+      document.addEventListener('click', (e) => {
+        if (!searchInput.contains(e.target) && !suggestionsList.contains(e.target) && !geoBtn.contains(e.target)) {
+          suggestionsList.style.display = 'none';
+        }
+      });
+
+      fetchSingleDayData();
+    }
+
+    function handleGeolocation() {
+      if (isFetching) return;
+
+      if (!navigator.geolocation) {
+        alert("Geolocation is not supported by your browser");
+        return;
+      }
+
+      locationText.innerText = "Detecting current location...";
+
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          currentLat = position.coords.latitude;
+          currentLng = position.coords.longitude;
+          currentLocationLabel = `Current Location (${currentLat.toFixed(2)}°, ${currentLng.toFixed(2)}°)`;
+          searchInput.value = currentLocationLabel;
+          fetchSingleDayData();
+        },
+        (error) => {
+          console.warn("Geolocation error:", error);
+          alert("Unable to retrieve your location. Please check your browser permissions.");
+          locationText.innerText = currentLocationLabel;
+        },
+        { timeout: 10000, maximumAge: 60000 }
+      );
+    }
+
+    function handleSearchInput(e) {
+      clearTimeout(searchDebounceTimeout);
+      const query = e.target.value.trim();
+
+      if (query.length < 2) {
+        suggestionsList.style.display = 'none';
+        return;
+      }
+
+      searchDebounceTimeout = setTimeout(async () => {
+        try {
+          const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=10&language=en&format=json`);
+          const data = await res.json();
+
+          if (!data.results || data.results.length === 0) {
+            suggestionsList.innerHTML = `<div class="suggestion-item"><span class="suggestion-name">No locations found</span></div>`;
+            suggestionsList.style.display = 'block';
+            return;
+          }
+
+          renderSuggestions(data.results);
+        } catch (err) {
+          console.error("Geocoding failed", err);
+        }
+      }, 250);
+    }
+
+    function renderSuggestions(results) {
+      suggestionsList.innerHTML = '';
+      results.forEach(loc => {
+        const item = document.createElement('div');
+        item.className = 'suggestion-item';
+
+        const hierarchy = [];
+        if (loc.admin3) hierarchy.push(loc.admin3);
+        if (loc.admin2 && loc.admin2 !== loc.admin3) hierarchy.push(loc.admin2);
+        if (loc.admin1 && loc.admin1 !== loc.admin2) hierarchy.push(loc.admin1);
+        if (loc.country) hierarchy.push(loc.country);
+
+        const detailText = hierarchy.join(', ');
+        const fullLabel = `${loc.name} (${detailText || 'UK'})`;
+
+        item.innerHTML = `
+          <div class="suggestion-title">
+            <span class="suggestion-name">${loc.name}</span>
+            <span class="suggestion-coords">${loc.latitude.toFixed(2)}°, ${loc.longitude.toFixed(2)}°</span>
+          </div>
+          <span class="suggestion-details">${detailText || 'Location'}</span>
+        `;
+
+        item.addEventListener('click', () => {
+          if (isFetching) return;
+          currentLat = loc.latitude;
+          currentLng = loc.longitude;
+          currentLocationLabel = fullLabel;
+          searchInput.value = fullLabel;
+          suggestionsList.style.display = 'none';
+          fetchSingleDayData();
+        });
+
+        suggestionsList.appendChild(item);
+      });
+
+      suggestionsList.style.display = 'block';
+    }
+
+    async function fetchWithRetry(url, signal, retries = 2, delay = 600) {
+      for (let i = 0; i <= retries; i++) {
+        try {
+          const res = await fetch(url, { signal });
+          if (res.ok) return await res.json();
+        } catch (err) {
+          if (err.name === 'AbortError') throw err;
+          if (i === retries) throw err;
+        }
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+      return null;
+    }
+
+    async function fetchSingleDayData() {
+      if (isFetching) return;
+      isFetching = true;
+
+      if (activeAbortController) {
+        activeAbortController.abort();
+      }
+      activeAbortController = new AbortController();
+      const { signal } = activeAbortController;
+
+      errorDiv.style.display = 'none';
+      locationText.innerText = `${currentLocationLabel} (Gathering complete data from all sources...)`;
+
+      const hours = Array.from({ length: 24 }, (_, i) => `${i.toString().padStart(2, '0')}:00`);
+
+      const fetchPromises = MODEL_CONFIG.map(async (model) => {
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${currentLat}&longitude=${currentLng}&hourly=temperature_2m,precipitation&start_date=${selectedDate}&end_date=${selectedDate}&timezone=auto&models=${model.id}`;
+        try {
+          const json = await fetchWithRetry(url, signal);
+          if (!json || !json.hourly) return null;
+
+          const tempKey = `temperature_2m_${model.id}`;
+          const rainKey = `precipitation_${model.id}`;
+
+          return {
+            modelId: model.id,
+            temps: json.hourly[tempKey] || json.hourly['temperature_2m'] || null,
+            rains: json.hourly[rainKey] || json.hourly['precipitation'] || null
+          };
+        } catch (err) {
+          if (err.name === 'AbortError') return null;
+          console.warn(`Failed to load ${model.label}:`, err);
+          return null;
+        }
+      });
+
+      let results;
+      try {
+        results = await Promise.all(fetchPromises);
+      } catch (err) {
+        isFetching = false;
+        return;
+      }
+
+      if (signal.aborted) {
+        isFetching = false;
+        return;
+      }
+
+      locationText.innerText = currentLocationLabel;
+      isFetching = false;
+
+      renderWeatherChart(results, hours);
+    }
+
+    function renderWeatherChart(modelResults, hours) {
+      const resultsMap = new Map();
+      modelResults.forEach(r => {
+        if (r) resultsMap.set(r.modelId, r);
+      });
+
+      const datasets = [];
+
+      // Iterate through MODEL_CONFIG strictly to maintain permanent fixed slots and colors for each source
+      MODEL_CONFIG.forEach(model => {
+        const res = resultsMap.get(model.id);
+        const temps = res ? res.temps : Array(24).fill(null);
+        const rains = res ? res.rains : Array(24).fill(null);
+
+        // Temperature Line Dataset
+        datasets.push({
+          type: 'line',
+          label: model.label,
+          data: temps,
+          backgroundColor: model.color,
+          borderColor: model.color,
+          pointStyle: 'circle',
+          pointRadius: 6,
+          pointHoverRadius: 9,
+          fill: false,
+          borderWidth: 2.5,
+          yAxisID: 'yTemp'
+        });
+
+        // Rainfall Bar Dataset
+        datasets.push({
+          type: 'bar',
+          label: `${model.label} (Rain)`,
+          data: rains,
+          backgroundColor: model.color + '99',
+          borderColor: model.color,
+          borderWidth: 1,
+          borderRadius: 3,
+          yAxisID: 'yRain'
+        });
+      });
+
+      const ctx = document.getElementById('weatherChart').getContext('2d');
+      if (weatherChartInstance) weatherChartInstance.destroy();
+
+      weatherChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: hours,
+          datasets: datasets
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              position: 'top',
+              labels: { 
+                color: '#f5f5f5', 
+                boxWidth: 14, 
+                font: { size: 12, weight: '500' },
+                padding: 12,
+                filter: (legendItem) => !legendItem.text.includes('(Rain)')
+              }
+            },
+            tooltip: {
+              titleFont: { size: 14 },
+              bodyFont: { size: 13 },
+              padding: 12,
+              callbacks: {
+                title: (items) => items.length ? `Time: ${items[0].label}` : '',
+                label: (ctx) => {
+                  const isTemp = ctx.dataset.yAxisID === 'yTemp';
+                  const unit = isTemp ? '°C' : 'mm';
+                  const type = isTemp ? 'Temp' : 'Rain';
+                  return `${ctx.dataset.label.replace(' (Rain)', '')} (${type}): ${ctx.parsed.y} ${unit}`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: '#262626' },
+              ticks: { color: '#a3a3a3', font: { size: 13 } },
+              title: { 
+                display: true, 
+                text: 'Hour of Day', 
+                color: '#f5f5f5',
+                font: { size: 14, weight: 'bold' },
+                padding: { top: 10 }
+              }
+            },
+            yTemp: {
+              type: 'linear',
+              position: 'left',
+              ticks: { color: '#f5f5f5', font: { size: 13 } },
+              grid: { color: '#262626' },
+              title: { 
+                display: true, 
+                text: 'Temperature (°C)', 
+                color: '#f5f5f5',
+                font: { size: 14, weight: 'bold' } 
+              }
+            },
+            yRain: {
+              type: 'linear',
+              position: 'right',
+              min: 0,
+              ticks: { color: '#60a5fa', font: { size: 13 } },
+              grid: { drawOnChartArea: false },
+              title: { 
+                display: true, 
+                text: 'Rain (mm)', 
+                color: '#60a5fa',
+                font: { size: 14, weight: 'bold' } 
+              }
+            }
+          }
+        }
+      });
+    }
+
+    window.onload = init;
+  </script>
+</body>
+</html>
