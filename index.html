@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Weather Chart</title>
 
+  <!-- PWA Manifest & Theme -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#2196F3">
+
   <!-- Chart.js CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
@@ -68,7 +72,6 @@
       gap: 24px;
       flex-wrap: wrap;
       align-items: center;
-      justify-content: space-between;
       margin-bottom: 20px;
       position: relative;
       z-index: 10;
@@ -77,8 +80,7 @@
     .search-group {
       position: relative;
       flex: 1;
-      min-width: 320px;
-      max-width: 520px;
+      min-width: 300px;
     }
 
     .search-group label {
@@ -133,7 +135,7 @@
       position: absolute;
       top: 100%;
       left: 0;
-      right: 0;
+      right: 52px;
       background: var(--card-bg);
       border: 1px solid var(--border);
       border-radius: 8px;
@@ -185,14 +187,6 @@
       color: var(--accent);
     }
 
-    .location-info {
-      color: var(--accent);
-      font-weight: 600;
-      font-size: 1.1rem;
-      text-align: right;
-      margin-left: auto;
-    }
-
     /* Text Forecast Card Styles */
     .text-forecast-card {
       background: var(--card-bg);
@@ -204,7 +198,7 @@
 
     .forecast-grid {
       display: grid;
-      grid-template-columns: repeat(7, 1fr);
+      grid-template-columns: repeat(8, 1fr);
       gap: 10px;
     }
 
@@ -303,15 +297,13 @@
   <div class="container">
     <div class="controls">
       <div class="search-group">
-        <label for="search-input">Search Location (Town/City/County):</label>
+        <label for="search-input">Search or Select Location:</label>
         <div class="search-input-wrapper">
-          <input type="text" id="search-input" placeholder="..." autocomplete="off" />
+          <input type="text" id="search-input" placeholder="Type city or town..." autocomplete="off" />
           <button type="button" id="geo-btn" class="geo-btn" title="Use current location">📍</button>
           <div id="suggestions" class="suggestions-list"></div>
         </div>
       </div>
-
-      <div class="location-info" id="location-text">Loading location...</div>
     </div>
 
     <div id="error" class="error-msg"></div>
@@ -354,7 +346,6 @@
     const searchInput = document.getElementById('search-input');
     const geoBtn = document.getElementById('geo-btn');
     const suggestionsList = document.getElementById('suggestions');
-    const locationText = document.getElementById('location-text');
     const errorDiv = document.getElementById('error');
     const textForecastGrid = document.getElementById('text-forecast-grid');
 
@@ -400,7 +391,32 @@
         }
       });
 
-      fetchAllData();
+      autoDetectLocationOnStartup();
+    }
+
+    function autoDetectLocationOnStartup() {
+      if (!navigator.geolocation) {
+        searchInput.value = currentLocationLabel;
+        fetchAllData();
+        return;
+      }
+
+      searchInput.value = "Detecting current location...";
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          currentLat = position.coords.latitude;
+          currentLng = position.coords.longitude;
+          currentLocationLabel = `Current Location (${currentLat.toFixed(2)}°, ${currentLng.toFixed(2)}°)`;
+          searchInput.value = currentLocationLabel;
+          selectedDate = new Date().toISOString().split('T')[0];
+          fetchAllData();
+        },
+        () => {
+          searchInput.value = currentLocationLabel;
+          fetchAllData();
+        },
+        { timeout: 10000, maximumAge: 60000 }
+      );
     }
 
     function handleGeolocation() {
@@ -409,7 +425,7 @@
         alert("Geolocation is not supported by your browser");
         return;
       }
-      locationText.innerText = "Detecting current location...";
+      searchInput.value = "Detecting current location...";
       navigator.geolocation.getCurrentPosition(
         (position) => {
           currentLat = position.coords.latitude;
@@ -421,7 +437,7 @@
         },
         () => {
           alert("Unable to retrieve your location.");
-          locationText.innerText = currentLocationLabel;
+          searchInput.value = currentLocationLabel;
         },
         { timeout: 10000, maximumAge: 60000 }
       );
@@ -506,11 +522,15 @@
       const { signal } = activeAbortController;
 
       errorDiv.style.display = 'none';
-      locationText.innerText = `${currentLocationLabel} (Gathering complete data...)`;
+      
+      const oldVal = searchInput.value;
+      if (!oldVal.includes("Gathering")) {
+        searchInput.value = `${currentLocationLabel} (Gathering complete data...)`;
+      }
 
       const startDate = new Date().toISOString().split('T')[0];
       const dEnd = new Date(startDate);
-      dEnd.setDate(dEnd.getDate() + 6);
+      dEnd.setDate(dEnd.getDate() + 7); // Extended to 7 days ahead (8 days total)
       const endDate = dEnd.toISOString().split('T')[0];
 
       const hours = Array.from({ length: 24 }, (_, i) => `${i.toString().padStart(2, '0')}:00`);
@@ -537,6 +557,7 @@
         results = await Promise.all(fetchPromises);
       } catch (err) {
         isFetching = false;
+        searchInput.value = currentLocationLabel;
         return;
       }
 
@@ -545,7 +566,7 @@
         return;
       }
 
-      locationText.innerText = currentLocationLabel;
+      searchInput.value = currentLocationLabel;
       isFetching = false;
 
       const validResults = results.filter(r => r !== null);
@@ -562,7 +583,7 @@
 
     function renderTextForecast(allResults, startDate) {
       textForecastGrid.innerHTML = '';
-      const daysCount = 7;
+      const daysCount = 8; // Exactly 8 days for a neat grid layout
       const ukmoResult = allResults.find(r => r.modelId === 'ukmo_seamless') || allResults[0];
 
       for (let d = 0; d < daysCount; d++) {
@@ -635,7 +656,7 @@
       const startDate = new Date().toISOString().split('T')[0];
       const startMs = new Date(startDate).getTime();
       const selectedMs = new Date(selectedDate).getTime();
-      const dayOffset = Math.max(0, Math.min(6, Math.round((selectedMs - startMs) / (1000 * 60 * 60 * 24))));
+      const dayOffset = Math.max(0, Math.min(7, Math.round((selectedMs - startMs) / (1000 * 60 * 60 * 24))));
 
       const resultsMap = new Map();
       allResults.forEach(r => {
@@ -673,7 +694,6 @@
 
       const datasets = [];
 
-      // Background Range Bands (including wind with translucent red background)
       datasets.push(
         { type: 'line', data: tempExtremes.mins, borderColor: 'transparent', backgroundColor: 'transparent', pointRadius: 0, fill: false, yAxisID: 'yTemp' },
         { type: 'line', data: tempExtremes.maxs, borderColor: 'transparent', backgroundColor: 'rgba(34, 197, 94, 0.08)', pointRadius: 0, fill: '-1', yAxisID: 'yTemp' },
@@ -685,7 +705,6 @@
         { type: 'line', data: windExtremes.maxs, borderColor: 'transparent', backgroundColor: 'rgba(239, 68, 68, 0.08)', pointRadius: 0, fill: '-1', yAxisID: 'yWind' }
       );
 
-      // Individual Model Lines with points enabled for Temp, Rain, and Wind
       MODEL_CONFIG.forEach(model => {
         const res = resultsMap.get(model.id);
         const temps = res ? res.temps : Array(24).fill(null);
@@ -800,6 +819,17 @@
     }
 
     window.onload = init;
+  </script>
+
+  <!-- Service Worker Registration Script -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then((reg) => console.log('Service Worker registered successfully!', reg.scope))
+          .catch((err) => console.log('Service Worker registration failed:', err));
+      });
+    }
   </script>
 </body>
 </html>
