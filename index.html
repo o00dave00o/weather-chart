@@ -246,23 +246,6 @@
       padding-bottom: 6px;
     }
 
-    .forecast-condition {
-      font-size: 0.7rem;
-      font-weight: 600;
-      padding: 3px 4px;
-      border-radius: 4px;
-      margin-bottom: 2px;
-      text-transform: uppercase;
-      letter-spacing: 0.02em;
-    }
-
-    .cond-stormy { background: rgba(239, 68, 68, 0.2); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.4); }
-    .cond-heavy-rain { background: rgba(96, 165, 250, 0.2); color: #60a5fa; border: 1px solid rgba(96, 165, 250, 0.4); }
-    .cond-showers { background: rgba(59, 130, 246, 0.15); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.3); }
-    .cond-overcast { background: rgba(156, 163, 175, 0.15); color: #d1d5db; border: 1px solid rgba(156, 163, 175, 0.3); }
-    .cond-clear { background: rgba(251, 191, 36, 0.15); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.3); }
-    .cond-partly-cloudy { background: rgba(52, 211, 153, 0.15); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.3); }
-
     .forecast-metric {
       display: flex;
       flex-direction: column;
@@ -473,12 +456,7 @@
       results.forEach(loc => {
         const item = document.createElement('div');
         item.className = 'suggestion-item';
-        const hierarchy = [];
-        if (loc.admin3) hierarchy.push(loc.admin3);
-        if (loc.admin2 && loc.admin2 !== loc.admin3) hierarchy.push(loc.admin2);
-        if (loc.admin1 && loc.admin1 !== loc.admin2) hierarchy.push(loc.admin1);
-        if (loc.country) hierarchy.push(loc.country);
-
+        const hierarchy = [loc.admin3, loc.admin2, loc.admin1, loc.country].filter((v, i, arr) => v && arr.indexOf(v) === i);
         const detailText = hierarchy.join(', ');
         const fullLabel = `${loc.name} (${detailText || 'UK'})`;
 
@@ -550,7 +528,6 @@
 
           return { modelId: model.id, temps, rains, winds: windsMph };
         } catch (err) {
-          if (err.name === 'AbortError') return null;
           return null;
         }
       });
@@ -583,31 +560,10 @@
       renderDailyChartForSelectedDate(validResults, hours);
     }
 
-    function inferWeatherCondition(maxT, minT, rain, maxWind) {
-      const tempRange = maxT - minT;
-
-      if (maxWind >= 28) {
-        return { label: 'Stormy / High Wind', class: 'cond-stormy' };
-      } else if (rain >= 5.0) {
-        return { label: 'Heavy Rain', class: 'cond-heavy-rain' };
-      } else if (rain > 0.5) {
-        return tempRange > 7 
-          ? { label: 'Sun & Showers', class: 'cond-showers' } 
-          : { label: 'Passing Showers', class: 'cond-showers' };
-      } else {
-        if (tempRange <= 4.5) {
-          return { label: 'Overcast & Damp', class: 'cond-overcast' };
-        } else if (tempRange >= 10) {
-          return { label: 'Clear & Sunny', class: 'cond-clear' };
-        } else {
-          return { label: 'Partly Cloudy', class: 'cond-partly-cloudy' };
-        }
-      }
-    }
-
     function renderTextForecast(allResults, startDate) {
       textForecastGrid.innerHTML = '';
       const daysCount = 7;
+      const ukmoResult = allResults.find(r => r.modelId === 'ukmo_seamless') || allResults[0];
 
       for (let d = 0; d < daysCount; d++) {
         const targetDateObj = new Date(startDate);
@@ -615,54 +571,45 @@
         const isoDate = targetDateObj.toISOString().split('T')[0];
         const dayLabel = d === 0 ? 'Today' : d === 1 ? 'Tomorrow' : targetDateObj.toLocaleDateString('en-GB', { weekday: 'short' });
 
-        let worstMax = -Infinity;
-        let worstMin = Infinity;
-        let worstRain = -1;
+        let dayMax = -Infinity;
+        let dayMin = Infinity;
+        let totalRain = 0;
         let peakWind = 0;
 
-        allResults.forEach(res => {
+        if (ukmoResult) {
           const startIdx = d * 24;
           const endIdx = startIdx + 24;
-          const dayTemps = res.temps.slice(startIdx, endIdx).filter(v => v !== null && v !== undefined);
-          const dayRains = res.rains.slice(startIdx, endIdx).filter(v => v !== null && v !== undefined);
-          const dayWinds = res.winds.slice(startIdx, endIdx).filter(v => v !== null && v !== undefined);
+          const dayTemps = ukmoResult.temps.slice(startIdx, endIdx).filter(v => v != null);
+          const dayRains = ukmoResult.rains.slice(startIdx, endIdx).filter(v => v != null);
+          const dayWinds = ukmoResult.winds.slice(startIdx, endIdx).filter(v => v != null);
 
-          if (dayTemps.length > 0 && dayRains.length > 0) {
-            const maxT = Math.max(...dayTemps);
-            const minT = Math.min(...dayTemps);
-            const totalRain = dayRains.reduce((a, b) => a + b, 0);
-            const maxW = dayWinds.length > 0 ? Math.max(...dayWinds) : 0;
-
-            if (totalRain > worstRain || (totalRain === worstRain && minT < worstMin)) {
-              worstMax = maxT;
-              worstMin = minT;
-              worstRain = totalRain;
-              peakWind = Math.max(peakWind, maxW);
-            }
+          if (dayTemps.length > 0) {
+            dayMax = Math.max(...dayTemps);
+            dayMin = Math.min(...dayTemps);
           }
-        });
+          if (dayRains.length > 0) totalRain = dayRains.reduce((a, b) => a + b, 0);
+          if (dayWinds.length > 0) peakWind = Math.max(...dayWinds);
+        }
 
         const col = document.createElement('div');
         col.className = `forecast-day-col ${isoDate === selectedDate ? 'active' : ''}`;
         col.dataset.date = isoDate;
 
-        if (worstRain === -1) {
+        if (!ukmoResult || dayMax === -Infinity) {
           col.innerHTML = `
             <div class="forecast-day-name">${dayLabel}</div>
             <div class="forecast-metric"><span class="label">No Data</span></div>
           `;
         } else {
-          const condition = inferWeatherCondition(worstMax, worstMin, worstRain, peakWind);
           col.innerHTML = `
             <div class="forecast-day-name">${dayLabel}</div>
-            <div class="forecast-condition ${condition.class}">${condition.label}</div>
             <div class="forecast-metric">
               <span class="label">Min / Max</span>
-              <span class="val">${Math.round(worstMin)}° / ${Math.round(worstMax)}°</span>
+              <span class="val">${Math.round(dayMin)}° / ${Math.round(dayMax)}°</span>
             </div>
             <div class="forecast-metric rain">
               <span class="label">Rain</span>
-              <span class="val">${worstRain.toFixed(1)}mm</span>
+              <span class="val">${totalRain.toFixed(1)}mm</span>
             </div>
             <div class="forecast-metric wind">
               <span class="label">Peak Wind</span>
@@ -688,12 +635,11 @@
       const startDate = new Date().toISOString().split('T')[0];
       const startMs = new Date(startDate).getTime();
       const selectedMs = new Date(selectedDate).getTime();
-      const dayOffset = Math.round((selectedMs - startMs) / (1000 * 60 * 60 * 24));
-      const safeOffset = Math.max(0, Math.min(6, dayOffset));
+      const dayOffset = Math.max(0, Math.min(6, Math.round((selectedMs - startMs) / (1000 * 60 * 60 * 24))));
 
       const resultsMap = new Map();
       allResults.forEach(r => {
-        const startIdx = safeOffset * 24;
+        const startIdx = dayOffset * 24;
         const endIdx = startIdx + 24;
         resultsMap.set(r.modelId, {
           temps: r.temps.slice(startIdx, endIdx),
@@ -702,76 +648,115 @@
         });
       });
 
+      function computeExtremes(metricKey) {
+        const mins = Array(24).fill(Infinity);
+        const maxs = Array(24).fill(-Infinity);
+
+        for (let i = 0; i < 24; i++) {
+          MODEL_CONFIG.forEach(m => {
+            const res = resultsMap.get(m.id);
+            if (res && res[metricKey][i] != null) {
+              const val = res[metricKey][i];
+              if (val < mins[i]) mins[i] = val;
+              if (val > maxs[i]) maxs[i] = val;
+            }
+          });
+          if (mins[i] === Infinity) mins[i] = null;
+          if (maxs[i] === -Infinity) maxs[i] = null;
+        }
+        return { mins, maxs };
+      }
+
+      const tempExtremes = computeExtremes('temps');
+      const rainExtremes = computeExtremes('rains');
+      const windExtremes = computeExtremes('winds');
+
       const datasets = [];
 
+      // Background Range Bands (including wind with translucent red background)
+      datasets.push(
+        { type: 'line', data: tempExtremes.mins, borderColor: 'transparent', backgroundColor: 'transparent', pointRadius: 0, fill: false, yAxisID: 'yTemp' },
+        { type: 'line', data: tempExtremes.maxs, borderColor: 'transparent', backgroundColor: 'rgba(34, 197, 94, 0.08)', pointRadius: 0, fill: '-1', yAxisID: 'yTemp' },
+
+        { type: 'line', data: rainExtremes.mins, borderColor: 'transparent', backgroundColor: 'transparent', pointRadius: 0, fill: false, yAxisID: 'yRain' },
+        { type: 'line', data: rainExtremes.maxs, borderColor: 'transparent', backgroundColor: 'rgba(59, 130, 246, 0.1)', pointRadius: 0, fill: '-1', yAxisID: 'yRain' },
+
+        { type: 'line', data: windExtremes.mins, borderColor: 'transparent', backgroundColor: 'transparent', pointRadius: 0, fill: false, yAxisID: 'yWind' },
+        { type: 'line', data: windExtremes.maxs, borderColor: 'transparent', backgroundColor: 'rgba(239, 68, 68, 0.08)', pointRadius: 0, fill: '-1', yAxisID: 'yWind' }
+      );
+
+      // Individual Model Lines with points enabled for Temp, Rain, and Wind
       MODEL_CONFIG.forEach(model => {
         const res = resultsMap.get(model.id);
         const temps = res ? res.temps : Array(24).fill(null);
         const rains = res ? res.rains : Array(24).fill(null);
         const winds = res ? res.winds : Array(24).fill(null);
 
-        datasets.push({
-          type: 'line',
-          label: model.label,
-          data: temps,
-          backgroundColor: model.color,
-          borderColor: model.color,
-          pointRadius: 5,
-          fill: false,
-          borderWidth: 2,
-          yAxisID: 'yTemp'
-        });
+        const isUKMO = model.id === 'ukmo_seamless';
 
-        datasets.push({
-          type: 'bar',
-          label: `${model.label} (Rain)`,
-          data: rains,
-          backgroundColor: model.color + '66',
-          borderColor: model.color,
-          borderWidth: 1,
-          borderRadius: 2,
-          yAxisID: 'yRain'
-        });
+        const tempColor = isUKMO ? '#22c55e' : '#22c55e33';
+        const rainColor = isUKMO ? '#3b82f6' : '#3b82f633';
+        const windColor = isUKMO ? '#ef4444' : '#ef444433';
 
-        datasets.push({
-          type: 'line',
-          label: `${model.label} (Wind)`,
-          data: winds,
-          borderColor: model.color,
-          borderDash: [4, 4],
-          borderWidth: 1.5,
-          pointRadius: 0,
-          fill: false,
-          yAxisID: 'yWind'
-        });
+        datasets.push(
+          {
+            type: 'line',
+            label: `${model.label} (Temp)`,
+            data: temps,
+            backgroundColor: tempColor,
+            borderColor: tempColor,
+            pointRadius: isUKMO ? 5 : 2,
+            fill: false,
+            borderWidth: isUKMO ? 3 : 1,
+            yAxisID: 'yTemp'
+          },
+          {
+            type: 'line',
+            label: `${model.label} (Rain)`,
+            data: rains,
+            backgroundColor: rainColor,
+            borderColor: rainColor,
+            borderWidth: isUKMO ? 2.5 : 1,
+            borderDash: isUKMO ? [] : [2, 2],
+            pointRadius: isUKMO ? 4 : 1.5,
+            fill: false,
+            yAxisID: 'yRain'
+          },
+          {
+            type: 'line',
+            label: `${model.label} (Wind)`,
+            data: winds,
+            backgroundColor: windColor,
+            borderColor: windColor,
+            borderDash: [4, 4],
+            borderWidth: isUKMO ? 2 : 1,
+            pointRadius: isUKMO ? 4 : 1.5,
+            fill: false,
+            yAxisID: 'yWind'
+          }
+        );
       });
 
       const ctx = document.getElementById('weatherChart').getContext('2d');
       if (weatherChartInstance) weatherChartInstance.destroy();
 
       weatherChartInstance = new Chart(ctx, {
-        type: 'bar',
-        data: { labels: hours, datasets: datasets },
+        type: 'line',
+        data: { labels: hours, datasets },
         options: {
           responsive: true,
           maintainAspectRatio: false,
           plugins: {
             legend: {
-              position: 'top',
-              labels: { 
-                color: '#f5f5f5', 
-                boxWidth: 14, 
-                font: { size: 12, weight: '500' },
-                padding: 12,
-                filter: (legendItem) => !legendItem.text.includes('(Rain)') && !legendItem.text.includes('(Wind)')
-              }
+              display: false
             },
             tooltip: {
               callbacks: {
                 title: (items) => items.length ? `Time: ${items[0].label}` : '',
                 label: (ctx) => {
+                  if (ctx.dataset.label === undefined || ctx.dataset.label.includes('undefined')) return null;
                   const yAxis = ctx.dataset.yAxisID;
-                  const labelName = ctx.dataset.label.replace(' (Rain)', '').replace(' (Wind)', '');
+                  const labelName = ctx.dataset.label.replace(' (Temp)', '').replace(' (Rain)', '').replace(' (Wind)', '');
                   if (yAxis === 'yTemp') return `${labelName} (Temp): ${ctx.parsed.y}°C`;
                   if (yAxis === 'yRain') return `${labelName} (Rain): ${ctx.parsed.y} mm`;
                   return `${labelName} (Wind): ${Math.round(ctx.parsed.y)} mph`;
@@ -787,26 +772,26 @@
             yTemp: {
               type: 'linear',
               position: 'left',
-              ticks: { color: '#f5f5f5' },
+              ticks: { color: '#22c55e' },
               grid: { color: '#262626' },
-              title: { display: true, text: 'Temperature (°C)', color: '#f5f5f5', font: { weight: 'bold' } }
+              title: { display: true, text: 'Temperature (°C)', color: '#22c55e', font: { weight: 'bold' } }
             },
             yRain: {
               type: 'linear',
               position: 'right',
               min: 0,
               max: 20,
-              ticks: { color: '#60a5fa' },
+              ticks: { color: '#3b82f6' },
               grid: { drawOnChartArea: false },
-              title: { display: true, text: 'Rain (mm)', color: '#60a5fa', font: { weight: 'bold' } }
+              title: { display: true, text: 'Rain (mm)', color: '#3b82f6', font: { weight: 'bold' } }
             },
             yWind: {
               type: 'linear',
               position: 'right',
               min: 0,
               grid: { drawOnChartArea: false },
-              ticks: { color: '#34d399', font: { size: 11 } },
-              title: { display: true, text: 'Wind (mph)', color: '#34d399', font: { weight: 'bold' } }
+              ticks: { color: '#ef4444', font: { size: 11 } },
+              title: { display: true, text: 'Wind (mph)', color: '#ef4444', font: { weight: 'bold' } }
             }
           }
         },
