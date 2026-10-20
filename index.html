@@ -7,19 +7,22 @@
 
   <!-- PWA Manifest & Theme -->
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#2196F3">
+  <meta name="theme-color" content="#0a0a0a">
 
   <!-- Chart.js CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
     :root {
-      --bg: #050505;            /* Deep black canvas */
-      --card-bg: #121212;       /* Subtle off-black cards */
-      --border: #262626;        /* Subtle dark borders */
-      --text: #f5f5f5;          /* Crisp light text */
-      --muted: #a3a3a3;         /* Neutral grey labels */
-      --accent: #3b82f6;        /* Clean accent blue */
+      --bg: #09090b;            /* Dense engineering matte black */
+      --card-bg: #121215;       /* Instrument panel surface */
+      --card-hover: #18181b;    /* Active instrument surface */
+      --border: #27272a;        /* Precision panel borders */
+      --border-active: #52525b; /* Active state border */
+      --text: #fafafa;          /* High contrast readout white */
+      --muted: #71717a;         /* Muted telemetry grey */
+      --accent: #2563eb;        /* Functional instrument blue */
+      --accent-subtle: rgba(37, 99, 235, 0.12);
     }
 
     * {
@@ -29,50 +32,39 @@
     }
 
     html, body {
-      height: 100vh;
+      min-height: 100vh;
       overflow-x: hidden;
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       background-color: var(--bg);
       color: var(--text);
-      line-height: 1.5;
-      padding: 24px 32px;
+      line-height: 1.45;
+      padding: 20px 24px;
       display: flex;
       flex-direction: column;
     }
 
     .container {
-      max-width: 1720px;
+      max-width: 1680px;
       width: 100%;
       margin: 0 auto;
       display: flex;
       flex-direction: column;
-      height: 100%;
-    }
-
-    header {
-      text-align: center;
-      margin-bottom: 20px;
-    }
-
-    h1 {
-      font-size: 2.2rem;
-      margin-bottom: 6px;
-      letter-spacing: -0.02em;
+      flex: 1;
+      gap: 16px;
     }
 
     .controls {
       background: var(--card-bg);
-      padding: 20px 24px;
-      border-radius: 12px;
+      padding: 16px 20px;
+      border-radius: 6px;
       border: 1px solid var(--border);
       display: flex;
-      gap: 24px;
+      gap: 20px;
       flex-wrap: wrap;
       align-items: center;
-      margin-bottom: 20px;
       position: relative;
       z-index: 10;
     }
@@ -80,13 +72,15 @@
     .search-group {
       position: relative;
       flex: 1;
-      min-width: 300px;
+      min-width: 280px;
     }
 
     .search-group label {
       display: block;
-      font-size: 0.95rem;
-      font-weight: 500;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
       color: var(--muted);
       margin-bottom: 6px;
     }
@@ -102,58 +96,59 @@
       background: var(--bg);
       color: var(--text);
       border: 1px solid var(--border);
-      padding: 10px 14px;
-      border-radius: 8px;
-      font-size: 1.05rem;
+      padding: 9px 12px;
+      border-radius: 4px;
+      font-size: 0.95rem;
       outline: none;
+      transition: border-color 0.15s ease;
     }
 
     input[type="text"]:focus {
-      border-color: var(--accent);
+      border-color: var(--border-active);
     }
 
     .geo-btn {
       background: var(--bg);
       color: var(--text);
       border: 1px solid var(--border);
-      padding: 0 14px;
-      border-radius: 8px;
+      padding: 0 12px;
+      border-radius: 4px;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.1rem;
-      transition: all 0.2s ease;
+      font-size: 1rem;
+      transition: all 0.15s ease;
     }
 
     .geo-btn:hover {
-      border-color: var(--accent);
-      background: rgba(59, 130, 246, 0.1);
+      border-color: var(--border-active);
+      background: var(--card-hover);
     }
 
     .suggestions-list {
       position: absolute;
       top: 100%;
       left: 0;
-      right: 52px;
+      right: 44px;
       background: var(--card-bg);
       border: 1px solid var(--border);
-      border-radius: 8px;
-      max-height: 320px;
+      border-radius: 4px;
+      max-height: 280px;
       overflow-y: auto;
       z-index: 1000;
-      margin-top: 6px;
-      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.8);
+      margin-top: 4px;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.9);
       display: none;
     }
 
     .suggestion-item {
-      padding: 12px 16px;
+      padding: 10px 14px;
       cursor: pointer;
       border-bottom: 1px solid var(--border);
       display: flex;
       flex-direction: column;
-      gap: 3px;
+      gap: 2px;
     }
 
     .suggestion-item:last-child {
@@ -161,7 +156,7 @@
     }
 
     .suggestion-item:hover {
-      background-color: var(--bg);
+      background-color: var(--card-hover);
     }
 
     .suggestion-title {
@@ -171,35 +166,34 @@
     }
 
     .suggestion-name {
-      font-weight: 600;
+      font-weight: 500;
       color: var(--text);
-      font-size: 1.05rem;
+      font-size: 0.95rem;
     }
 
     .suggestion-coords {
-      font-size: 0.85rem;
+      font-size: 0.75rem;
       color: var(--muted);
-      font-family: monospace;
+      font-family: ui-monospace, monospace;
     }
 
     .suggestion-details {
-      font-size: 0.9rem;
-      color: var(--accent);
+      font-size: 0.8rem;
+      color: var(--muted);
     }
 
     /* Text Forecast Card Styles */
     .text-forecast-card {
       background: var(--card-bg);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 20px 24px;
-      margin-bottom: 20px;
+      border-radius: 6px;
+      padding: 16px 20px;
     }
 
     .forecast-grid {
       display: grid;
       grid-template-columns: repeat(8, 1fr);
-      gap: 10px;
+      gap: 8px;
     }
 
     @media (max-width: 1100px) {
@@ -211,31 +205,30 @@
     .forecast-day-col {
       background: var(--bg);
       border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 12px 10px;
+      border-radius: 4px;
+      padding: 10px 8px;
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 4px;
       text-align: center;
       cursor: pointer;
-      transition: all 0.2s ease;
+      transition: all 0.15s ease;
     }
 
     .forecast-day-col:hover {
-      border-color: var(--accent);
-      background: rgba(59, 130, 246, 0.05);
+      border-color: var(--border-active);
+      background: var(--card-hover);
     }
 
     .forecast-day-col.active {
-      border-color: var(--accent);
-      background: rgba(59, 130, 246, 0.15);
-      box-shadow: 0 0 12px rgba(59, 130, 246, 0.2);
+      border-color: var(--text);
+      background: #18181b;
     }
 
     .forecast-day-name {
       font-weight: 600;
-      color: var(--accent);
-      font-size: 0.95rem;
+      color: var(--text);
+      font-size: 0.85rem;
       border-bottom: 1px solid var(--border);
       padding-bottom: 6px;
     }
@@ -246,26 +239,28 @@
     }
 
     .forecast-metric .label {
-      font-size: 0.65rem;
+      font-size: 0.6rem;
       color: var(--muted);
       text-transform: uppercase;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.06em;
     }
 
     .forecast-metric .val {
-      font-weight: 600;
-      font-size: 0.9rem;
+      font-weight: 500;
+      font-size: 0.85rem;
       color: var(--text);
+      font-family: ui-monospace, monospace;
     }
 
-    .forecast-metric.rain .val { color: #60a5fa; }
-    .forecast-metric.wind .val { color: #34d399; }
+    .forecast-metric.temp .val { color: #22c55e; }
+    .forecast-metric.rain .val { color: #3b82f6; }
+    .forecast-metric.wind .val { color: #ef4444; }
 
     .chart-card {
       background: var(--card-bg);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 24px;
+      border-radius: 6px;
+      padding: 20px;
       flex: 1;
       display: flex;
       flex-direction: column;
@@ -276,19 +271,17 @@
       position: relative;
       width: 100%;
       height: 100%;
-      min-height: 450px;
+      min-height: 440px;
     }
 
     .error-msg {
       display: none;
-      background: #450a0a;
-      color: #fca5a5;
+      background: #270606;
+      color: #f87171;
       border: 1px solid #7f1d1d;
-      padding: 12px;
-      border-radius: 8px;
-      margin-bottom: 16px;
-      text-align: center;
-      font-size: 1rem;
+      padding: 10px 14px;
+      border-radius: 4px;
+      font-size: 0.9rem;
     }
   </style>
 </head>
@@ -297,10 +290,10 @@
   <div class="container">
     <div class="controls">
       <div class="search-group">
-        <label for="search-input">Search or Select Location:</label>
+        <label for="search-input">Location Search</label>
         <div class="search-input-wrapper">
-          <input type="text" id="search-input" placeholder="Type city or town..." autocomplete="off" />
-          <button type="button" id="geo-btn" class="geo-btn" title="Use current location">📍</button>
+          <input type="text" id="search-input" placeholder="Enter station or locality..." autocomplete="off" />
+          <button type="button" id="geo-btn" class="geo-btn" title="Use current location">◎</button>
           <div id="suggestions" class="suggestions-list"></div>
         </div>
       </div>
@@ -366,17 +359,17 @@
 
         ctx.save();
         ctx.beginPath();
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = '#f43f5e';
-        ctx.setLineDash([4, 4]);
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = '#ef4444';
+        ctx.setLineDash([2, 2]);
         ctx.moveTo(xCoord, topY);
         ctx.lineTo(xCoord, bottomY);
         ctx.stroke();
 
-        ctx.fillStyle = '#f43f5e';
-        ctx.font = 'bold 11px sans-serif';
+        ctx.fillStyle = '#ef4444';
+        ctx.font = '500 10px ui-monospace, monospace';
         ctx.textAlign = 'center';
-        ctx.fillText('NOW', xCoord, topY - 8);
+        ctx.fillText('NOW', xCoord, topY - 6);
         ctx.restore();
       }
     };
@@ -401,12 +394,12 @@
         return;
       }
 
-      searchInput.value = "Detecting current location...";
+      searchInput.value = "Acquiring location...";
       navigator.geolocation.getCurrentPosition(
         (position) => {
           currentLat = position.coords.latitude;
           currentLng = position.coords.longitude;
-          currentLocationLabel = `Current Location (${currentLat.toFixed(2)}°, ${currentLng.toFixed(2)}°)`;
+          currentLocationLabel = `Coordinates (${currentLat.toFixed(2)}°, ${currentLng.toFixed(2)}°)`;
           searchInput.value = currentLocationLabel;
           selectedDate = new Date().toISOString().split('T')[0];
           fetchAllData();
@@ -425,12 +418,12 @@
         alert("Geolocation is not supported by your browser");
         return;
       }
-      searchInput.value = "Detecting current location...";
+      searchInput.value = "Acquiring location telemetry...";
       navigator.geolocation.getCurrentPosition(
         (position) => {
           currentLat = position.coords.latitude;
           currentLng = position.coords.longitude;
-          currentLocationLabel = `Current Location (${currentLat.toFixed(2)}°, ${currentLng.toFixed(2)}°)`;
+          currentLocationLabel = `Coordinates (${currentLat.toFixed(2)}°, ${currentLng.toFixed(2)}°)`;
           searchInput.value = currentLocationLabel;
           selectedDate = new Date().toISOString().split('T')[0];
           fetchAllData();
@@ -524,8 +517,8 @@
       errorDiv.style.display = 'none';
       
       const oldVal = searchInput.value;
-      if (!oldVal.includes("Gathering")) {
-        searchInput.value = `${currentLocationLabel} (Gathering complete data...)`;
+      if (!oldVal.includes("Fetching")) {
+        searchInput.value = `${currentLocationLabel} [Fetching datasets...]`;
       }
 
       const startDate = new Date().toISOString().split('T')[0];
@@ -571,7 +564,7 @@
 
       const validResults = results.filter(r => r !== null);
       if (validResults.length === 0) {
-        errorDiv.innerText = 'Error loading forecast data. Please try another location.';
+        errorDiv.innerText = 'Error loading forecast datasets. Please verify location parameters.';
         errorDiv.style.display = 'block';
         return;
       }
@@ -624,7 +617,7 @@
         } else {
           col.innerHTML = `
             <div class="forecast-day-name">${dayLabel}</div>
-            <div class="forecast-metric">
+            <div class="forecast-metric temp">
               <span class="label">Min / Max</span>
               <span class="val">${Math.round(dayMin)}° / ${Math.round(dayMax)}°</span>
             </div>
@@ -633,8 +626,8 @@
               <span class="val">${Math.round(totalRain)}mm</span>
             </div>
             <div class="forecast-metric wind">
-              <span class="label">Peak Wind</span>
-              <span class="val">${Math.round(peakWind)} mph</span>
+              <span class="label">Wind</span>
+              <span class="val">${Math.round(peakWind)}mph</span>
             </div>
           `;
         }
@@ -652,12 +645,10 @@
       }
     }
 
-    // Helper to snap scale ranges to clean logical step intervals
     function getLogicalScaleBounds(rawMin, rawMax, targetSteps = 5) {
       const range = rawMax - rawMin || 1;
       const roughStep = range / targetSteps;
       
-      // Choose nice logical step magnitudes (1, 2, 5, 10, etc.)
       const magnitude = Math.pow(10, Math.floor(Math.log10(roughStep)));
       const normalizedStep = roughStep / magnitude;
       
@@ -676,9 +667,7 @@
 
     function renderDailyChartForSelectedDate(allResults, hours) {
       const startDate = new Date().toISOString().split('T')[0];
-      const startMs = new Date(startDate).getTime();
-      const selectedMs = new Date(selectedDate).getTime();
-      const dayOffset = Math.max(0, Math.min(7, Math.round((selectedMs - startMs) / (1000 * 60 * 60 * 24))));
+      const dayOffset = Math.max(0, Math.min(7, Math.round((new Date(selectedDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24))));
 
       let globalTempMin = Infinity;
       let globalTempMax = -Infinity;
@@ -704,7 +693,6 @@
         });
       });
 
-      // Compute clean, logical bounds with uniform grid increments
       const tempBounds = getLogicalScaleBounds(globalTempMin - 1, globalTempMax + 1, 5);
       const rainBounds = getLogicalScaleBounds(0, Math.max(2, (globalRainMax || 0) * 1.2), 4);
       const windBounds = getLogicalScaleBounds(0, globalWindMax + 4, 5);
@@ -743,18 +731,16 @@
       const rainExtremes = computeDailyExtremes('rains');
       const windExtremes = computeDailyExtremes('winds');
 
-      const datasets = [];
-
-      datasets.push(
+      const datasets = [
         { type: 'line', data: tempExtremes.mins, borderColor: 'transparent', backgroundColor: 'transparent', pointRadius: 0, fill: false, yAxisID: 'yTemp' },
-        { type: 'line', data: tempExtremes.maxs, borderColor: 'transparent', backgroundColor: 'rgba(34, 197, 94, 0.08)', pointRadius: 0, fill: '-1', yAxisID: 'yTemp' },
+        { type: 'line', data: tempExtremes.maxs, borderColor: 'transparent', backgroundColor: 'rgba(34, 197, 94, 0.05)', pointRadius: 0, fill: '-1', yAxisID: 'yTemp' },
 
         { type: 'line', data: rainExtremes.mins, borderColor: 'transparent', backgroundColor: 'transparent', pointRadius: 0, fill: false, yAxisID: 'yRain' },
-        { type: 'line', data: rainExtremes.maxs, borderColor: 'transparent', backgroundColor: 'rgba(59, 130, 246, 0.1)', pointRadius: 0, fill: '-1', yAxisID: 'yRain' },
+        { type: 'line', data: rainExtremes.maxs, borderColor: 'transparent', backgroundColor: 'rgba(59, 130, 246, 0.05)', pointRadius: 0, fill: '-1', yAxisID: 'yRain' },
 
         { type: 'line', data: windExtremes.mins, borderColor: 'transparent', backgroundColor: 'transparent', pointRadius: 0, fill: false, yAxisID: 'yWind' },
-        { type: 'line', data: windExtremes.maxs, borderColor: 'transparent', backgroundColor: 'rgba(239, 68, 68, 0.08)', pointRadius: 0, fill: '-1', yAxisID: 'yWind' }
-      );
+        { type: 'line', data: windExtremes.maxs, borderColor: 'transparent', backgroundColor: 'rgba(239, 68, 68, 0.05)', pointRadius: 0, fill: '-1', yAxisID: 'yWind' }
+      ];
 
       MODEL_CONFIG.forEach(model => {
         const res = resultsMap.get(model.id);
@@ -764,9 +750,9 @@
 
         const isUKMO = model.id === 'ukmo_seamless';
 
-        const tempColor = isUKMO ? '#22c55e' : '#22c55e33';
-        const rainColor = isUKMO ? '#3b82f6' : '#3b82f633';
-        const windColor = isUKMO ? '#ef4444' : '#ef444433';
+        const tempColor = isUKMO ? '#22c55e' : '#22c55e26';
+        const rainColor = isUKMO ? '#3b82f6' : '#3b82f626';
+        const windColor = isUKMO ? '#ef4444' : '#ef444426';
 
         datasets.push(
           {
@@ -775,9 +761,9 @@
             data: temps,
             backgroundColor: tempColor,
             borderColor: tempColor,
-            pointRadius: isUKMO ? 5 : 2,
+            pointRadius: isUKMO ? 4 : 1.5,
             fill: false,
-            borderWidth: isUKMO ? 3 : 1,
+            borderWidth: isUKMO ? 2.5 : 1,
             yAxisID: 'yTemp'
           },
           {
@@ -786,9 +772,9 @@
             data: rains,
             backgroundColor: rainColor,
             borderColor: rainColor,
-            borderWidth: isUKMO ? 2.5 : 1,
+            borderWidth: isUKMO ? 2 : 1,
             borderDash: isUKMO ? [] : [2, 2],
-            pointRadius: isUKMO ? 4 : 1.5,
+            pointRadius: isUKMO ? 3.5 : 1,
             fill: false,
             yAxisID: 'yRain'
           },
@@ -798,9 +784,8 @@
             data: winds,
             backgroundColor: windColor,
             borderColor: windColor,
-            borderDash: [4, 4],
-            borderWidth: isUKMO ? 2 : 1,
-            pointRadius: isUKMO ? 4 : 1.5,
+            borderWidth: isUKMO ? 1.5 : 1,
+            pointRadius: isUKMO ? 3.5 : 1,
             fill: false,
             yAxisID: 'yWind'
           }
@@ -816,31 +801,33 @@
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          layout: {
-            padding: {
-              top: 24
-            }
-          },
+          layout: { padding: { top: 16 } },
           plugins: {
             legend: { display: false },
             tooltip: {
+              backgroundColor: '#18181b',
+              titleColor: '#fafafa',
+              bodyColor: '#d4d4d8',
+              borderColor: '#27272a',
+              borderWidth: 1,
+              padding: 10,
               callbacks: {
-                title: (items) => items.length ? `Time: ${items[0].label}` : '',
+                title: (items) => items.length ? `UTC Time: ${items[0].label}` : '',
                 label: (ctx) => {
                   if (ctx.dataset.label === undefined || ctx.dataset.label.includes('undefined')) return null;
                   const yAxis = ctx.dataset.yAxisID;
                   const labelName = ctx.dataset.label.replace(' (Temp)', '').replace(' (Rain)', '').replace(' (Wind)', '');
-                  if (yAxis === 'yTemp') return `${labelName} (Temp): ${Math.round(ctx.parsed.y)}°C`;
-                  if (yAxis === 'yRain') return `${labelName} (Rain): ${ctx.parsed.y.toFixed(1)} mm`;
-                  return `${labelName} (Wind): ${Math.round(ctx.parsed.y)} mph`;
+                  if (yAxis === 'yTemp') return `${labelName} Temperature: ${Math.round(ctx.parsed.y)}°C`;
+                  if (yAxis === 'yRain') return `${labelName} Precipitation: ${ctx.parsed.y.toFixed(1)} mm`;
+                  return `${labelName} Wind Speed: ${Math.round(ctx.parsed.y)} mph`;
                 }
               }
             }
           },
           scales: {
             x: {
-              grid: { color: '#262626' },
-              ticks: { color: '#a3a3a3', font: { size: 13 } }
+              grid: { color: '#27272a' },
+              ticks: { color: '#71717a', font: { size: 11, family: 'ui-monospace, monospace' } }
             },
             yTemp: {
               type: 'linear',
@@ -850,10 +837,11 @@
               ticks: { 
                 color: '#22c55e', 
                 stepSize: tempBounds.stepSize,
+                font: { family: 'ui-monospace, monospace', size: 11 },
                 callback: (val) => Math.round(val)
               },
-              grid: { color: '#262626' },
-              title: { display: true, text: 'Temperature (°C)', color: '#22c55e', font: { weight: 'bold' } }
+              grid: { color: '#27272a' },
+              title: { display: true, text: 'TEMPERATURE (°C)', color: '#22c55e', font: { weight: '600', size: 10 } }
             },
             yRain: {
               type: 'linear',
@@ -863,10 +851,11 @@
               ticks: { 
                 color: '#3b82f6', 
                 stepSize: rainBounds.stepSize,
+                font: { family: 'ui-monospace, monospace', size: 11 },
                 callback: (val) => Number.isInteger(val) ? val : val.toFixed(1)
               },
               grid: { drawOnChartArea: false },
-              title: { display: true, text: 'Rain (mm)', color: '#3b82f6', font: { weight: 'bold' } }
+              title: { display: true, text: 'PRECIPITATION (MM)', color: '#3b82f6', font: { weight: '600', size: 10 } }
             },
             yWind: {
               type: 'linear',
@@ -875,12 +864,12 @@
               max: windBounds.max,
               ticks: { 
                 color: '#ef4444', 
-                font: { size: 11 }, 
                 stepSize: windBounds.stepSize,
+                font: { family: 'ui-monospace, monospace', size: 11 },
                 callback: (val) => Math.round(val)
               },
               grid: { drawOnChartArea: false },
-              title: { display: true, text: 'Wind (mph)', color: '#ef4444', font: { weight: 'bold' } }
+              title: { display: true, text: 'WIND SPEED (MPH)', color: '#ef4444', font: { weight: '600', size: 10 } }
             }
           }
         },
