@@ -378,7 +378,7 @@
           }
         }
 
-        // 2. Draw Current Telemetry Box (Top Left in afternoon >= 12, Top Right before noon < 12)
+        // 2. Draw Current Telemetry Badge (Inline for landscape/desktop, Stacked for portrait)
         if (!cachedResults) return;
         const startDate = new Date().toISOString().split('T')[0];
         const dayOffset = Math.max(0, Math.min(7, Math.round((new Date(selectedDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24))));
@@ -399,30 +399,36 @@
 
         ctx.save();
         ctx.font = '500 11px ui-monospace, monospace';
-        
-        // Construct string parts to measure width accurately
+
+        const isPortrait = chart.width < 600 || window.innerHeight > window.innerWidth;
+
         const parts = [
           { label: 'Temp: ', val: tempStr, color: '#22c55e' },
           { label: 'Rain: ', val: rainStr, color: '#3b82f6' },
           { label: 'Wind: ', val: windStr, color: '#ef4444' }
         ];
 
-        let totalTextWidth = 0;
-        parts.forEach((p, idx) => {
-          totalTextWidth += ctx.measureText(p.label + p.val).width;
-          if (idx < parts.length - 1) totalTextWidth += ctx.measureText('  |  ').width;
-        });
-
         const paddingX = 12;
-        const paddingY = 8;
-        const boxWidth = totalTextWidth + (paddingX * 2);
-        const boxHeight = 26;
+        let boxWidth, boxHeight;
+
+        if (isPortrait) {
+          boxWidth = 110;
+          boxHeight = 68;
+        } else {
+          let totalTextWidth = 0;
+          parts.forEach((p, idx) => {
+            totalTextWidth += ctx.measureText(p.label + p.val).width;
+            if (idx < parts.length - 1) totalTextWidth += ctx.measureText('  |  ').width;
+          });
+          boxWidth = totalTextWidth + (paddingX * 2);
+          boxHeight = 26;
+        }
 
         // Position: Left if afternoon (>= 12), Right if before noon (< 12)
         const boxX = (currentHour >= 12) ? (chartArea.left + 12) : (chartArea.right - boxWidth - 12);
         const boxY = chartArea.top + 12;
 
-        // Draw background card matching your theme (--card-bg: #121215, --border: #27272a)
+        // Draw background card matching theme
         ctx.fillStyle = '#121215';
         ctx.strokeStyle = '#27272a';
         ctx.lineWidth = 1;
@@ -435,26 +441,41 @@
         ctx.fill();
         ctx.stroke();
 
-        // Draw text with colored highlights
         ctx.textBaseline = 'middle';
-        let cursorX = boxX + paddingX;
-        const centerY = boxY + (boxHeight / 2);
 
-        parts.forEach((p, idx) => {
-          ctx.fillStyle = '#71717a';
-          ctx.fillText(p.label, cursorX, centerY);
-          cursorX += ctx.measureText(p.label).width;
+        if (isPortrait) {
+          const rowHeight = boxHeight / 3;
+          parts.forEach((p, idx) => {
+            const rowCenterY = boxY + (rowHeight * idx) + (rowHeight / 2);
+            let cursorX = boxX + paddingX;
 
-          ctx.fillStyle = p.color;
-          ctx.fillText(p.val, cursorX, centerY);
-          cursorX += ctx.measureText(p.val).width;
+            ctx.fillStyle = '#71717a';
+            ctx.fillText(p.label, cursorX, rowCenterY);
+            cursorX += ctx.measureText(p.label).width;
 
-          if (idx < parts.length - 1) {
-            ctx.fillStyle = '#27272a';
-            ctx.fillText('  |  ', cursorX, centerY);
-            cursorX += ctx.measureText('  |  ').width;
-          }
-        });
+            ctx.fillStyle = p.color;
+            ctx.fillText(p.val, cursorX, rowCenterY);
+          });
+        } else {
+          let cursorX = boxX + paddingX;
+          const centerY = boxY + (boxHeight / 2);
+
+          parts.forEach((p, idx) => {
+            ctx.fillStyle = '#71717a';
+            ctx.fillText(p.label, cursorX, centerY);
+            cursorX += ctx.measureText(p.label).width;
+
+            ctx.fillStyle = p.color;
+            ctx.fillText(p.val, cursorX, centerY);
+            cursorX += ctx.measureText(p.val).width;
+
+            if (idx < parts.length - 1) {
+              ctx.fillStyle = '#27272a';
+              ctx.fillText('  |  ', cursorX, centerY);
+              cursorX += ctx.measureText('  |  ').width;
+            }
+          });
+        }
 
         ctx.restore();
       }
