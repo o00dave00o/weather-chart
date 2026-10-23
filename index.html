@@ -346,30 +346,116 @@
       id: 'nowMarker',
       afterDraw(chart) {
         const todayIso = new Date().toISOString().split('T')[0];
-        if (selectedDate !== todayIso) return;
+        const isToday = (selectedDate === todayIso);
+        const currentHour = isToday ? new Date().getHours() : 12;
 
-        const currentHour = new Date().getHours();
         const ctx = chart.ctx;
-        const xMeta = chart.getDatasetMeta(0);
-        if (!xMeta || !xMeta.data || !xMeta.data[currentHour]) return;
+        const chartArea = chart.chartArea;
+        if (!chartArea) return;
 
-        const xCoord = xMeta.data[currentHour].x;
-        const topY = chart.scales.yTemp.top;
-        const bottomY = chart.scales.yTemp.bottom;
+        // 1. Draw the vertical "NOW" line if viewing today
+        if (isToday) {
+          const xMeta = chart.getDatasetMeta(0);
+          if (xMeta && xMeta.data && xMeta.data[currentHour]) {
+            const xCoord = xMeta.data[currentHour].x;
+            const topY = chart.scales.yTemp.top;
+            const bottomY = chart.scales.yTemp.bottom;
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = '#ef4444';
+            ctx.setLineDash([2, 2]);
+            ctx.moveTo(xCoord, topY);
+            ctx.lineTo(xCoord, bottomY);
+            ctx.stroke();
+
+            ctx.fillStyle = '#ef4444';
+            ctx.font = '500 10px ui-monospace, monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText('NOW', xCoord, topY - 6);
+            ctx.restore();
+          }
+        }
+
+        // 2. Draw Current Telemetry Box (Top Left in afternoon >= 12, Top Right before noon < 12)
+        if (!cachedResults) return;
+        const startDate = new Date().toISOString().split('T')[0];
+        const dayOffset = Math.max(0, Math.min(7, Math.round((new Date(selectedDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24))));
+        const hourIdx = (dayOffset * 24) + currentHour;
+
+        const ukmoRes = cachedResults.find(r => r.modelId === 'ukmo_seamless') || cachedResults[0];
+        if (!ukmoRes) return;
+
+        const temp = ukmoRes.temps[hourIdx];
+        const rain = ukmoRes.rains[hourIdx];
+        const wind = ukmoRes.winds[hourIdx];
+
+        if (temp == null && rain == null && wind == null) return;
+
+        const tempStr = temp != null ? `${Math.round(temp)}°C` : 'N/A';
+        const rainStr = rain != null ? `${rain.toFixed(1)}mm` : 'N/A';
+        const windStr = wind != null ? `${Math.round(wind)}mph` : 'N/A';
 
         ctx.save();
+        ctx.font = '500 11px ui-monospace, monospace';
+        
+        // Construct string parts to measure width accurately
+        const parts = [
+          { label: 'Temp: ', val: tempStr, color: '#22c55e' },
+          { label: 'Rain: ', val: rainStr, color: '#3b82f6' },
+          { label: 'Wind: ', val: windStr, color: '#ef4444' }
+        ];
+
+        let totalTextWidth = 0;
+        parts.forEach((p, idx) => {
+          totalTextWidth += ctx.measureText(p.label + p.val).width;
+          if (idx < parts.length - 1) totalTextWidth += ctx.measureText('  |  ').width;
+        });
+
+        const paddingX = 12;
+        const paddingY = 8;
+        const boxWidth = totalTextWidth + (paddingX * 2);
+        const boxHeight = 26;
+
+        // Position: Left if afternoon (>= 12), Right if before noon (< 12)
+        const boxX = (currentHour >= 12) ? (chartArea.left + 12) : (chartArea.right - boxWidth - 12);
+        const boxY = chartArea.top + 12;
+
+        // Draw background card matching your theme (--card-bg: #121215, --border: #27272a)
+        ctx.fillStyle = '#121215';
+        ctx.strokeStyle = '#27272a';
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.lineWidth = 1.5;
-        ctx.strokeStyle = '#ef4444';
-        ctx.setLineDash([2, 2]);
-        ctx.moveTo(xCoord, topY);
-        ctx.lineTo(xCoord, bottomY);
+        if (typeof ctx.roundRect === 'function') {
+          ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 4);
+        } else {
+          ctx.rect(boxX, boxY, boxWidth, boxHeight);
+        }
+        ctx.fill();
         ctx.stroke();
 
-        ctx.fillStyle = '#ef4444';
-        ctx.font = '500 10px ui-monospace, monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText('NOW', xCoord, topY - 6);
+        // Draw text with colored highlights
+        ctx.textBaseline = 'middle';
+        let cursorX = boxX + paddingX;
+        const centerY = boxY + (boxHeight / 2);
+
+        parts.forEach((p, idx) => {
+          ctx.fillStyle = '#71717a';
+          ctx.fillText(p.label, cursorX, centerY);
+          cursorX += ctx.measureText(p.label).width;
+
+          ctx.fillStyle = p.color;
+          ctx.fillText(p.val, cursorX, centerY);
+          cursorX += ctx.measureText(p.val).width;
+
+          if (idx < parts.length - 1) {
+            ctx.fillStyle = '#27272a';
+            ctx.fillText('  |  ', cursorX, centerY);
+            cursorX += ctx.measureText('  |  ').width;
+          }
+        });
+
         ctx.restore();
       }
     };
